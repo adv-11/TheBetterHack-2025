@@ -166,10 +166,147 @@ Your Expected Output:
 fragmented_output_from_agent = fragmentor_agent.generate_reply(messages= messages_for_fragmentor)
 
 
-messages_for_migrator = []
+messages_for_migrator =  [
+
+    {"role" : "system", 
+     "content" : ''' 
+
+You are an expert Code Migration Specialist with deep expertise in transforming legacy codebases into modern architectures. Your task is to analyze the *fragmentation report* and the *entire legacy codebase* and generate a *fully migrated version of the code* based on provided report.
+
+
+Inputs Given to You: 
+
+
+1. *Fragmentation Report:*
+- A structured breakdown of the legacy codebase into *functional features*.
+- Each feature's functionality, dependencies, and files associated with it.
+- Detailed Feature Definitions.
+- The mapping of old files to their modern equivalents feature wise.
+
+2. Complete Codebase (Before Migration):
+- Full source code of the existing legacy system.
+- Project directory structure, including all files, modules, and dependencies.
+
+3. Human Expectations
+
+4. Human Guidelines
+
+Your Expected Output:
+
+1. Provide Migrated Code for Each Feature**
+- *For each feature listed in the fragmentation report, generate its fully migrated equivalent*.
+- Ensure the new code:
+  - *Uses the modern tech stack and adheres to best practices.*
+  - *Preserves business logic while improving performance and security.*
+  - *Refactors outdated code structures to enhance readability and maintainability.*
+  - *Ensures compatibility with the new database, API structures, and dependencies.*
+
+
+'''
+     },
+
+ {"role": "user", 
+     "content" : f'''
+
+        Fragmentation Report: 
+{fragmented_output_from_agent}
+
+
+Human Expectations: 
+{human_expectations}
+
+Human Guidelines: 
+{human_guidelines}
+
+'''
+     },
+
+
+
+    {"role": "user", 
+     "content" : f'''
+        Code Structure: {tree}
+        Code base : {content}
+'''},
+
+
+]
 
 migrator_agent = ConversableAgent(
     "chatbot",
     llm_config={"config_list": [{"model": "gpt-4o", "api_key": os.environ.get("OPENAI_API_KEY")}]},
     human_input_mode="NEVER",  # No manual intervention
 )
+
+
+
+migrated_code_output = migrator_agent.generate_reply(messages= messages_for_migrator)
+
+
+# tester code 
+from autogen.coding import LocalCommandLineCodeExecutor
+import tempfile
+temp_dir = tempfile.TemporaryDirectory()
+
+
+executor = LocalCommandLineCodeExecutor(
+    timeout=10,  # Timeout for each code execution in seconds.
+    work_dir=temp_dir.name,  # Use the temporary directory to store the code files.
+)
+
+
+testing_agent = ConversableAgent(
+    "testing",
+    llm_config=False,  # Turn off LLM for this agent.
+    code_execution_config={"executor": executor},  # Use the local command line code executor.
+    human_input_mode="ALWAYS",  # Always take human input for this agent for safety.
+)
+
+
+# msg
+messages_for_tester =  [
+
+    {"role" : "system", 
+     "content" : ''' 
+
+You are an expert Code Testing and Execution Specialist with deep expertise in validating modernized codebases. You are given access to the local command-line executor. Your task is to analyze the *migrated code*, compile and execute it using a local command-line executor, and report its execution status.
+
+---
+
+## Inputs Given to You:**
+
+### 1. *Migrated Code from the Migrator Agent*
+- Fully transformed source code that was migrated from a legacy system.
+- Updated dependencies, database queries, and API structures.
+
+
+
+---
+
+## Your Expected Output:**
+
+### *1. Compile and Execute the Migrated Code*
+- *Use the local command-line executor* to attempt *compiling and running the migrated code*.
+- Capture and report:
+  - *Successful execution* (if the code runs without errors).
+  - *Compilation errors* (if any, specify file names and exact error messages).
+  - *Partial success* (list parts of the system that executed successfully and those that failed).
+  
+
+
+'''
+     },
+
+ {"role": "user", 
+     "content" : f'''
+
+        Migrated Code: 
+{migrated_code_output}
+
+
+'''
+},
+
+]
+
+tester_output = testing_agent.generate_reply(messages= messages_for_tester)
