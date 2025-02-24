@@ -1,5 +1,5 @@
 import streamlit as st
-from gitingest import ingest
+from gitingest import ingest  
 import asyncio
 import sys
 from docx import Document
